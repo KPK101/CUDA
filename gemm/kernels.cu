@@ -1,3 +1,7 @@
+/*
+Author: Pranav Kumar Kota
+year: 2024
+*/
 
 __global__ void naive_kernel(int M, int N, int K, float *A, float *B, float *C) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;

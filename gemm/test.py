@@ -1,3 +1,7 @@
+"""
+Author: Pranav Kumar Kota
+year: 2024
+"""
 import pycuda.autoinit
 import pycuda.driver as cuda
 import pycuda.gpuarray as gpuarray
