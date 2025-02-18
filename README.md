@@ -13,4 +13,3 @@ This is a repository of CUDA kernels written in native CUDA and PyCUDA.
   - Blockwise computation done using an auxillary buffer
   - TBD: thread pattern change to reduce divergence, shared memory
 
-  - 
