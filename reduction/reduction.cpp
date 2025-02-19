@@ -51,31 +51,31 @@ Threads will execute as follows for eachs stride:
 */
 
 
-void displayArray(const int* buffer, int n){
+void displayArray(const int* buffer, size_t n){
 
     std::cout<<"Displaying buffer -> \n";
-    for(int i=0; i<n; i++){
+    for(size_t i=0; i<n; i++){
         std::cout<<buffer[i]<<std::endl;
     }    
 }
 
 
 
-void displayGrid(int block, int n){
+void displayGrid(int block, size_t n){
     // display grid structure
     std::cout<<"Grid size: ("<<(n-1+2*block)/(2*block)<<", 1, 1)\n";
     std::cout<<"Block size:("<<block<<", 1, 1)\n";
 }
 
 
-int getGrid(int block, int n){
+int getGrid(int block, size_t n){
     return (n-1+2*block)/(2*block);
 }
 
 template<typename T>
 __global__ void reduce(T *buffer, int n){
-    int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    int index;
+    size_t tid = threadIdx.x + blockIdx.x*blockDim.x;
+    size_t index;
     for(int s=1; s<=BLOCK; s*=2){
         // check if thread ids are divisible by 2*s 
         index = 2*tid*s;
@@ -87,16 +87,14 @@ __global__ void reduce(T *buffer, int n){
 }
 
 template<typename T>
-__global__ void reduceBlock(T *buffer, T* aux_buffer, int n){
+__global__ void reduceBlock(T *buffer, T* aux_buffer, size_t n){
   
-    int bid = 2;
-
     int bstart = blockIdx.x*2*blockDim.x;
-    int tid = threadIdx.x;
-    int index;
+    size_t tid = threadIdx.x;
+    size_t index;
 
 
-    for(int s=1; s<=BLOCK; s*=2){
+    for(size_t s=1; s<=BLOCK; s*=2){
         
         index = 2*tid*s + bstart; 
         if(index+s<n){
@@ -114,19 +112,17 @@ __global__ void reduceBlock(T *buffer, T* aux_buffer, int n){
 }
 
 template<typename T>
-__global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, int n){
+__global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, size_t n){
   
-    int bid = 2;
-
     int bstart = blockIdx.x*2*blockDim.x;
-    int tid = threadIdx.x;
+    size_t tid = threadIdx.x;
     int sindex;
 
     __shared__ int sm[2*BLOCK];
 
     // Load into shared memory
     for(int i=0; i<2; i++){
-        int gindex = blockIdx.x*2*blockDim.x + threadIdx.x + i*BLOCK;
+        size_t gindex = blockIdx.x*2*blockDim.x + threadIdx.x + i*BLOCK;
         if(gindex < n){
             sm[threadIdx.x + i*BLOCK] = buffer[gindex];
         }
@@ -155,12 +151,11 @@ __global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, int n){
 }
 
 template<typename T>
-T* deviceReduction(T*d_buffer, T*d_aux_buffer, int n, int stack){
+T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
    
     T* result_ptr;
     size_t size = n*sizeof(T);
     int gd = getGrid(BLOCK, n);
-    int bid = 0;
 
     dim3 block(BLOCK, 1, 1);
     dim3 grid(gd, 1, 1);
@@ -184,7 +179,7 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, int n, int stack){
     std::cout << "---------------------\nPre-reduction\n---------------------\n";    
     std::cout << "\tBuffer:\n\t";
 
-    for(int i=0; i<n; i++){
+    for(size_t i=0; i<n; i++){
         if(i%(2*BLOCK)==0){
             std::cout << " ||| ";
         }
@@ -195,7 +190,7 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, int n, int stack){
     std::cout << " ||| \n";
     std::cout << "\tAuxillary Buffer:\n\t";
     
-    for(int i=0; i<n; i++){
+    for(size_t i=0; i<n; i++){
         std::cout << " "<< aux_buffer_read[i] << " ,";
     }
     
@@ -218,7 +213,7 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, int n, int stack){
     std::cout << "\n---------------------\nPost-reduction\n---------------------\n";    
     std::cout << "\tBuffer:\n\t";
 
-    for(int i=0; i<n; i++){
+    for(size_t i=0; i<n; i++){
         if(i%(2*BLOCK)==0){
             std::cout << " ||| ";
         }
@@ -228,7 +223,7 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, int n, int stack){
     std::cout << " ||| \n";
     std::cout << "\tAuxillary Buffer:\n\t";
     
-    for(int i=0; i<n; i++){
+    for(size_t i=0; i<n; i++){
         std::cout << " "<< aux_buffer_read[i] << " ,";
     }
     std::cout << "\n\n\n";
@@ -267,7 +262,7 @@ int main(){
     }
 
     size_t size = N*sizeof(int);
-    int a_n = getGrid(BLOCK, N); // Initial aux buffer length - #blocks
+    size_t a_n = getGrid(BLOCK, N); // Initial aux buffer length - #blocks
 
     // Allocate memory on device
     CHECK_CUDA(cudaMalloc((void**)&d_buffer, size));
