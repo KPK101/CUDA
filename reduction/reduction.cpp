@@ -183,7 +183,7 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
 
     for(int i=0; i<n; i++){
         if(i%(2*BLOCK)==0){
-            printf(" ||| ");
+            std::cout << " ||| ";
         }
         std::cout << " "<< buffer_read[i] << " ,";
         
