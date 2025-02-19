@@ -59,18 +59,6 @@ void displayArray(const int* buffer, int n){
     }    
 }
 
-__global__ void reduce(int *buffer, int n){
-    int tid = threadIdx.x + blockIdx.x*blockDim.x;
-    int index;
-    for(int s=1; s<=BLOCK; s*=2){
-        // check if thread ids are divisible by 2*s 
-        index = 2*tid*s;
-        if(index+s<n){
-            buffer[index] += buffer[index+s];
-        }
-        __syncthreads();
-    }
-}
 
 
 void displayGrid(int block, int n){
@@ -83,9 +71,23 @@ void displayGrid(int block, int n){
 int getGrid(int block, int n){
     return (n-1+2*block)/(2*block);
 }
-    
 
-__global__ void reduceBlock(int *buffer, int* aux_buffer, int n){
+template<typename T>
+__global__ void reduce(T *buffer, int n){
+    int tid = threadIdx.x + blockIdx.x*blockDim.x;
+    int index;
+    for(int s=1; s<=BLOCK; s*=2){
+        // check if thread ids are divisible by 2*s 
+        index = 2*tid*s;
+        if(index+s<n){
+            buffer[index] += buffer[index+s];
+        }
+        __syncthreads();
+    }
+}
+
+template<typename T>
+__global__ void reduceBlock(T *buffer, T* aux_buffer, int n){
   
     int bid = 2;
 
@@ -111,7 +113,8 @@ __global__ void reduceBlock(int *buffer, int* aux_buffer, int n){
 
 }
 
-__global__ void reduceBlock_SharedMemory(int *buffer, int* aux_buffer, int n){
+template<typename T>
+__global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, int n){
   
     int bid = 2;
 
@@ -151,21 +154,21 @@ __global__ void reduceBlock_SharedMemory(int *buffer, int* aux_buffer, int n){
 
 }
 
-
-int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
+template<typename T>
+T* deviceReduction(T*d_buffer, T*d_aux_buffer, int n, int stack){
    
-    int* result_ptr;
-    size_t size = n*sizeof(int);
+    T* result_ptr;
+    size_t size = n*sizeof(T);
     int gd = getGrid(BLOCK, n);
     int bid = 0;
 
     dim3 block(BLOCK, 1, 1);
     dim3 grid(gd, 1, 1);
 
-    int* buffer_read;
-    int* aux_buffer_read;
-    buffer_read = (int*)malloc(n*sizeof(int));
-    aux_buffer_read = (int*) malloc(n*sizeof(int));
+    T* buffer_read;
+    T* aux_buffer_read;
+    buffer_read = (T*)malloc(n*sizeof(T));
+    aux_buffer_read = (T*) malloc(n*sizeof(T));
     CHECK_MALLOC(buffer_read, n);
     CHECK_MALLOC(aux_buffer_read, n);
     ////////////////////
