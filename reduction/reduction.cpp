@@ -92,6 +92,47 @@ __global__ void reduceBlock(int *buffer, int* aux_buffer, int n){
 
 }
 
+__global__ void reduceBlock_SharedMemory(int *buffer, int* aux_buffer, int n){
+  
+    int bid = 2;
+
+    int bstart = blockIdx.x*2*blockDim.x;
+    int tid = threadIdx.x;
+    int sindex;
+
+    __shared__ int sm[2*BLOCK];
+
+    // Load into shared memory
+    for(int i=0; i<2; i++){
+        int gindex = blockIdx.x*2*blockDim.x + threadIdx.x + i*BLOCK;
+        if(gindex < N){
+            sm[threadIdx.x + i*BLOCK] = buffer[gindex];
+        }
+        else{
+            sm[threadIdx.x + i*BLOCK] = 0;
+        }        
+     }
+    __syncthreads();
+
+
+
+    // perform reduction in shared memory
+    for(int s=1; s<=BLOCK; s*=2){
+        sindex = 2*tid*s;   
+        if(sindex+s<n){
+
+            sm[sindex] += sm[sindex+s];
+        }      
+        __syncthreads();
+    }
+    
+    if(threadIdx.x==0){
+        aux_buffer[blockIdx.x] = sm[0];
+    }
+
+}
+
+
 int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
    
     int* result_ptr;
