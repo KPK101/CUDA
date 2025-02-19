@@ -1,9 +1,28 @@
-#define N 1024
-#define BLOCK 4
+#define N 32
+#define BLOCK 2
 #include <iostream>
 #include <cuda_runtime.h>
 #include<vector>
 
+inline void checkCUDAErrors(cudaError_t err, const char* file, int line){
+    if(err!=cudaSuccess){
+        std::cerr << "CUDA error at " << file << ":" << line << ":" << cudaGetErrorString(err) << std::endl;
+        exit(EXIT_FAILURE); 
+    }
+}
+
+#define CHECK_CUDA(call) checkCUDAErrors(call, __FILE__, __LINE__)
+
+
+inline void checkMalloc(int *ptr, int size, const char* file, int line){
+    if(ptr==nullptr){
+        std::cerr << "Memory allocation failed at " << file << ":" << line << std::endl;
+        std::cerr << "Failed to allocate " << size << "bytes" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+# define CHECK_MALLOC(ptr, size) checkMalloc(ptr, size, __FILE__, __LINE__)
 /*
 
 Input array is of size N
@@ -32,7 +51,7 @@ Threads will execute as follows for eachs stride:
 */
 
 
-void displayArray(int* buffer, int n){
+void displayArray(const int* buffer, int n){
 
     std::cout<<"Displaying buffer -> \n";
     for(int i=0; i<n; i++){
@@ -105,7 +124,7 @@ __global__ void reduceBlock_SharedMemory(int *buffer, int* aux_buffer, int n){
     // Load into shared memory
     for(int i=0; i<2; i++){
         int gindex = blockIdx.x*2*blockDim.x + threadIdx.x + i*BLOCK;
-        if(gindex < N){
+        if(gindex < n){
             sm[threadIdx.x + i*BLOCK] = buffer[gindex];
         }
         else{
@@ -147,15 +166,16 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
     int* aux_buffer_read;
     buffer_read = (int*)malloc(n*sizeof(int));
     aux_buffer_read = (int*) malloc(n*sizeof(int));
-
-
+    CHECK_MALLOC(buffer_read, n);
+    CHECK_MALLOC(aux_buffer_read, n);
     ////////////////////
     // Pre reduction ///
     ////////////////////
 
-    cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaDeviceSynchronize());
+
     printf("****************************\nstack=%d\n****************************\n",stack);
     printf("---------------------\nPre-reduction\n---------------------\n");    
     printf("\tBuffer:\n\t");
@@ -166,24 +186,30 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
         }
         printf(" %d ,", buffer_read[i]);
         
-    }    
+    }   
+
     printf(" ||| ");
     printf("\t\nAuxillary Buffer:\n\t");
     
     for(int i=0; i<n; i++){
         printf(" %d ,", aux_buffer_read[i]);
     }
-    ///////////////////////////////////////
-     
+    
+    /////////////////////////////
+    /////////////////////////////
+    /////////////////////////////
+ 
     reduceBlock<<<grid, block>>>(d_buffer, d_aux_buffer, n);
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaGetLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
 
     //////////////////////////////
     ////// Post reduction ////////
     //////////////////////////////
-    cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost);
-    cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
+
+    CHECK_CUDA(cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaDeviceSynchronize());
 
     printf("\n---------------------\nPost-reduction\n---------------------\n");    
     printf("\tBuffer:\n\t");
@@ -202,7 +228,10 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
         printf(" %d ,", aux_buffer_read[i]);
     }
     printf("\n\n\n");
-    ///////////////////////////////////////////
+
+    ///////////////////////////////
+    ///////////////////////////////
+    ///////////////////////////////
 
     if(gd==1){
         return d_aux_buffer;
@@ -211,43 +240,49 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
         result_ptr = deviceReduction(d_aux_buffer, d_buffer, gd, stack + 1);
         return result_ptr;
     }
-
+    
+    // free host data
+    free(buffer_read);
+    free(aux_buffer_read);
 }
 
 int main(){
 
-   // define input host buffer 
-   int h_buffer[N];
+    // define input host buffer 
+    int h_buffer[N];
     int sum = 0;
 
-   // define device buffer
-   int *d_buffer;
-   int *d_aux_buffer;
+    // define device buffer
+    int *d_buffer;
+    int *d_aux_buffer;
     int* d_result;
 
-   // fill input values - [1, N]
-   for(int i=0; i<N; i++){
-    h_buffer[i] = i+1;
-   }
-   
-   size_t size = N*sizeof(int);
-   int a_n = getGrid(BLOCK, N); // Initial aux buffer length - #blocks
+    // fill input values - [1, N]
+    for(int i=0; i<N; i++){
+        h_buffer[i] = i+1;
+    }
 
-   // Allocate memory on device
-   cudaMalloc((void**)&d_buffer, size);
-   cudaMalloc((void**)&d_aux_buffer, size);
+    size_t size = N*sizeof(int);
+    int a_n = getGrid(BLOCK, N); // Initial aux buffer length - #blocks
 
-   // Copy data into d_buffer
-   cudaMemcpy((void*)d_buffer, (void*)h_buffer, size, cudaMemcpyHostToDevice);
+    // Allocate memory on device
+    CHECK_CUDA(cudaMalloc((void**)&d_buffer, size));
+    CHECK_CUDA(cudaMalloc((void**)&d_aux_buffer, size));
 
-   // Call reduction function
-   d_result = deviceReduction(d_buffer, d_aux_buffer, N, 0); 
+    // Copy data into d_buffer
+    CHECK_CUDA(cudaMemcpy((void*)d_buffer, (void*)h_buffer, size, cudaMemcpyHostToDevice));
+
+    // Call reduction function
+    d_result = deviceReduction(d_buffer, d_aux_buffer, N, 0); 
 
     // Synchronize global context 
-    cudaDeviceSynchronize();
+    CHECK_CUDA(cudaDeviceSynchronize());
 
-   // Copy result[0] to sum
-   cudaMemcpy(&sum, d_result, sizeof(int), cudaMemcpyDeviceToHost);
+    // Copy result[0] to sum
+    CHECK_CUDA(cudaMemcpy(&sum, d_result, sizeof(int), cudaMemcpyDeviceToHost));
+
+    cudaFree(d_buffer);
+    cudaFree(d_aux_buffer);
 
    std::cout<<"The computed sum is: "<<sum<<std::endl;
 }
