@@ -74,19 +74,6 @@ __global__ void reduceBlock(int *buffer, int* aux_buffer, int n){
     int tid = threadIdx.x;
     int index;
 
-    // if(blockIdx.x != bid){
-    //     return;
-    // }
-
-    // if(blockIdx.x==bid && threadIdx.x==0){
-    //         printf("\n\n\nDisplaying block %d\n\n\n", bid);
-    //         for(int i=0; i<2*blockDim.x; i++){
-    //             if(i+bid*2*blockDim.x >= n) break;
-    //             printf("%d , ",buffer[i+bid*2*blockDim.x]);
-    //         }
-    //         printf("\n\n\n");
-    //     }
-    // __syncthreads();
 
     for(int s=1; s<=BLOCK; s*=2){
         
@@ -94,38 +81,8 @@ __global__ void reduceBlock(int *buffer, int* aux_buffer, int n){
         if(index+s<n){
             buffer[index] += buffer[index+s];  
         }      
-        // if(blockIdx.x==bid && s==1){
-        //         printf("\n (%d)@(%d) \n", index, buffer[index]);
-        // }
+
         __syncthreads();
-
-        // if(threadIdx.x==0 && blockIdx.x==bid){
-        //     printf("s = %d\n",s);
-        // }
-
-        // //////////////////////////////////////
-        // //////////// DEBUG //////////////////
-        // ////////////////////////////////////
-        // if(blockIdx.x==bid && threadIdx.x==0){
-        //     for(int i=0; i<2*blockDim.x; i++){
-        //         if(i+bid*2*blockDim.x >= n) break;
-
-        //         int idx = i+bid*2*blockDim.x;
-
-        //         if(i%(2*s)==0){
-        //             printf("[%d] , ",buffer[i+bid*2*blockDim.x]);
-        //         }   
-        //         else{
-        //             printf("%d , ",buffer[i+bid*2*blockDim.x]);
-        //         }
-                
-        //     }
-        //     printf("\n");
-        // }
-        // __syncthreads();
-        // ///////////////////////////////////
-        // //////////////////////////////////
-        // /////////////////////////////////
 
     }
     
@@ -237,7 +194,6 @@ int main(){
 
    // Allocate memory on device
    cudaMalloc((void**)&d_buffer, size);
-//    cudaMalloc((void**)&d_aux_buffer, a_n*sizeof(int));
    cudaMalloc((void**)&d_aux_buffer, size);
 
    // Copy data into d_buffer
@@ -246,14 +202,7 @@ int main(){
    // Call reduction function
    d_result = deviceReduction(d_buffer, d_aux_buffer, N, 0); 
 
-    // int gd = getGrid(BLOCK, N);
-    // dim3 block(BLOCK, 1, 1);
-    // dim3 grid(gd, 1, 1);
-  
-    // displayGrid(BLOCK, N);
-
-    // reduceBlock<<<grid, block>>>(d_buffer, d_aux_buffer, N);
-    
+    // Synchronize global context 
     cudaDeviceSynchronize();
 
    // Copy result[0] to sum
