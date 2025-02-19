@@ -176,23 +176,24 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
     CHECK_CUDA(cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaDeviceSynchronize());
 
-    printf("****************************\nstack=%d\n****************************\n",stack);
-    printf("---------------------\nPre-reduction\n---------------------\n");    
-    printf("\tBuffer:\n\t");
+
+    std::cout << "****************************\nstack="<< stack <<"\n****************************\n";
+    std::cout << "---------------------\nPre-reduction\n---------------------\n";    
+    std::cout << "\tBuffer:\n\t";
 
     for(int i=0; i<n; i++){
         if(i%(2*BLOCK)==0){
             printf(" ||| ");
         }
-        printf(" %d ,", buffer_read[i]);
+        std::cout << " "<< buffer_read[i] << " ,";
         
     }   
 
-    printf(" ||| ");
-    printf("\t\nAuxillary Buffer:\n\t");
+    std::cout << " ||| \n";
+    std::cout << "\tAuxillary Buffer:\n\t";
     
     for(int i=0; i<n; i++){
-        printf(" %d ,", aux_buffer_read[i]);
+        std::cout << " "<< aux_buffer_read[i] << " ,";
     }
     
     /////////////////////////////
@@ -210,24 +211,24 @@ int* deviceReduction(int*d_buffer, int*d_aux_buffer, int n, int stack){
     CHECK_CUDA(cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaDeviceSynchronize());
-
-    printf("\n---------------------\nPost-reduction\n---------------------\n");    
-    printf("\tBuffer:\n\t");
+     
+    std::cout << "\n---------------------\nPost-reduction\n---------------------\n";    
+    std::cout << "\tBuffer:\n\t";
 
     for(int i=0; i<n; i++){
         if(i%(2*BLOCK)==0){
-            printf(" ||| ");
+            std::cout << " ||| ";
         }
-        printf(" %d ,", buffer_read[i]);
+        std::cout << " "<< buffer_read[i] << " ,";
         
     }    
-    printf(" ||| ");
-    printf("\t\nAuxillary Buffer:\n\t");
+    std::cout << " ||| \n";
+    std::cout << "\tAuxillary Buffer:\n\t";
     
     for(int i=0; i<n; i++){
-        printf(" %d ,", aux_buffer_read[i]);
+        std::cout << " "<< aux_buffer_read[i] << " ,";
     }
-    printf("\n\n\n");
+    std::cout << "\n\n\n";
 
     ///////////////////////////////
     ///////////////////////////////
