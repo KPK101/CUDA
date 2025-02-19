@@ -206,7 +206,7 @@ int main(){
     cudaDeviceSynchronize();
 
    // Copy result[0] to sum
-   cudaMemcpy(&sum, d_buffer, sizeof(int), cudaMemcpyDeviceToHost);
+   cudaMemcpy(&sum, d_result, sizeof(int), cudaMemcpyDeviceToHost);
 
    std::cout<<"The computed sum is: "<<sum<<std::endl;
 }
