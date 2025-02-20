@@ -4,6 +4,8 @@
 #include <cuda_runtime.h>
 #include<vector>
 #include <typeinfo>
+#include<random>
+#include<ctime>
 
 inline void checkCUDAErrors(cudaError_t err, const char* file, int line){
     if(err!=cudaSuccess){
@@ -285,6 +287,27 @@ T* deviceReduction(T *d_buffer, T *d_aux_buffer, size_t n, size_t stack){
 
 }
 
+template<typename T>
+T getRandom(){
+    //Thanks GPT!
+    static std::mt19937 rng(static_cast<unsigned int>(std::time(0)));  // Random number generator
+
+    if constexpr (std::is_integral_v<T>) {
+        // If type is integral (like int, long, etc.)
+        std::uniform_int_distribution<T> dist(1, 100);  
+        return dist(rng);
+    }
+    else if constexpr (std::is_floating_point_v<T>) {
+        // If type is floating-point (like float, double)
+        std::uniform_real_distribution<T> dist(0.0, 1.0); 
+        return dist(rng);
+    }
+    else {
+        // If type is not supported, throw an error (or handle differently)
+        throw std::invalid_argument("Unsupported type for random generation.");
+    }
+}
+
 int main(){
 
     using bufferType = float;
@@ -299,7 +322,8 @@ int main(){
 
     // fill input values - [1, N]
     for(size_t i=0; i<N; i++){
-        h_buffer[i] = static_cast<bufferType>(i+1);
+        // h_buffer[i] = static_cast<bufferType>(i+1);
+        h_buffer[i] = getRandom<bufferType>();
     }
 
     size_t size = N*sizeof(bufferType);
@@ -325,6 +349,5 @@ int main(){
     cudaFree(d_aux_buffer);
 
    std::cout<<"The computed sum is: "<<sum<<std::endl;
-   std::cout << "Type of sum: "<< typeid(sum).name() <<std::endl;
 }
 
