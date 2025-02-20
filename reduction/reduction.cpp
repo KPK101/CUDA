@@ -1,4 +1,4 @@
-#define N 32
+#define N 3200
 #define BLOCK 2
 #include <iostream>
 #include <cuda_runtime.h>
@@ -308,6 +308,34 @@ T getRandom(){
     }
 }
 
+template<typename T>
+T cpuComp(T *buffer, size_t n){
+    // test function - checks if computed sum is correct
+    T sum = 0;
+    for(size_t i=0; i<n; i++){
+        sum += buffer[i];
+    }
+
+    return sum;
+}
+
+template<typename T>
+bool testComp(T* buffer, size_t n, T gpuSum, double atol=1e-5, double rtol=1e-5){
+    T cpuSum = cpuComp(buffer, n);
+    T diff = abs(cpuSum - gpuSum);
+
+    if(diff<atol){
+        std::cout << "GPU sum is correct!\n";
+        return true;
+    } 
+    else{    
+        std::cout << "GPU sum is wrong :(\n";
+        std::cout << "\tAbsolute difference: "<<diff<<"\n";
+        std::cout << "\tRelative difference: "<<diff/n<<"\n";
+        return false;
+    }
+}
+
 int main(){
 
     using bufferType = float;
@@ -349,5 +377,7 @@ int main(){
     cudaFree(d_aux_buffer);
 
    std::cout<<"The computed sum is: "<<sum<<std::endl;
+
+   bool valid = testComp<bufferType>(h_buffer, N, sum);
 }
 
