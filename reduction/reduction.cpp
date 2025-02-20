@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cuda_runtime.h>
 #include<vector>
+#include <typeinfo>
 
 inline void checkCUDAErrors(cudaError_t err, const char* file, int line){
     if(err!=cudaSuccess){
@@ -13,8 +14,8 @@ inline void checkCUDAErrors(cudaError_t err, const char* file, int line){
 
 #define CHECK_CUDA(call) checkCUDAErrors(call, __FILE__, __LINE__)
 
-
-inline void checkMalloc(int *ptr, int size, const char* file, int line){
+template <typename T>
+inline void checkMalloc(T *ptr, int size, const char* file, int line){
     if(ptr==nullptr){
         std::cerr << "Memory allocation failed at " << file << ":" << line << std::endl;
         std::cerr << "Failed to allocate " << size << "bytes" << std::endl;
@@ -23,6 +24,9 @@ inline void checkMalloc(int *ptr, int size, const char* file, int line){
 }
 
 # define CHECK_MALLOC(ptr, size) checkMalloc(ptr, size, __FILE__, __LINE__)
+
+// #define DEBUG
+
 /*
 
 Input array is of size N
@@ -50,8 +54,8 @@ Threads will execute as follows for eachs stride:
 
 */
 
-
-void displayArray(const int* buffer, size_t n){
+template<typename T>
+void displayArray(const T* buffer, size_t n){
 
     std::cout<<"Displaying buffer -> \n";
     for(size_t i=0; i<n; i++){
@@ -61,14 +65,14 @@ void displayArray(const int* buffer, size_t n){
 
 
 
-void displayGrid(int block, size_t n){
+void displayGrid(size_t block, size_t n){
     // display grid structure
     std::cout<<"Grid size: ("<<(n-1+2*block)/(2*block)<<", 1, 1)\n";
     std::cout<<"Block size:("<<block<<", 1, 1)\n";
 }
 
 
-int getGrid(int block, size_t n){
+int getGrid(size_t block, size_t n){
     return (n-1+2*block)/(2*block);
 }
 
@@ -122,7 +126,7 @@ __global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, size_t n){
     size_t tid = threadIdx.x;
     int sindex;
 
-    __shared__ int sm[2*BLOCK];
+    __shared__ T sm[2*BLOCK];
 
     // Load into shared memory
     for(int i=0; i<2; i++){
@@ -155,7 +159,7 @@ __global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, size_t n){
 }
 
 template<typename T>
-T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
+T* deviceReduction(T *d_buffer, T *d_aux_buffer, size_t n, size_t stack){
     /*
         This is a host function that recursively calls reduction kernels on input array
         At each recursion step, the input array is reduced blockwise and sum is stored in 0th index of each block
@@ -175,20 +179,29 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
     dim3 block(BLOCK, 1, 1);
     dim3 grid(gd, 1, 1);
 
+    #ifdef DEBUG
+
+    // debug array declarations
+    // arrays to read and display buffer and aux_buffer data
+    
     T* buffer_read;
     T* aux_buffer_read;
     buffer_read = (T*)malloc(n*sizeof(T));
     aux_buffer_read = (T*) malloc(n*sizeof(T));
     CHECK_MALLOC(buffer_read, n);
     CHECK_MALLOC(aux_buffer_read, n);
+    
+    #endif
+    
+    
     ////////////////////
     // Pre reduction ///
     ////////////////////
+    #ifdef DEBUG
 
     CHECK_CUDA(cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaDeviceSynchronize());
-
 
     std::cout << "****************************\nstack="<< stack <<"\n****************************\n";
     std::cout << "---------------------\nPre-reduction\n---------------------\n";    
@@ -208,7 +221,8 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
     for(size_t i=0; i<n; i++){
         std::cout << " "<< aux_buffer_read[i] << " ,";
     }
-    
+
+    #endif
     /////////////////////////////
     /////////////////////////////
     /////////////////////////////
@@ -221,10 +235,12 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
     ////// Post reduction ////////
     //////////////////////////////
 
+    #ifdef DEBUG 
+
     CHECK_CUDA(cudaMemcpy(buffer_read, d_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaMemcpy(aux_buffer_read, d_aux_buffer, size, cudaMemcpyDeviceToHost));
     CHECK_CUDA(cudaDeviceSynchronize());
-     
+    
     std::cout << "\n---------------------\nPost-reduction\n---------------------\n";    
     std::cout << "\tBuffer:\n\t";
 
@@ -243,9 +259,13 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
     }
     std::cout << "\n\n\n";
 
+    #endif
+
     ///////////////////////////////
     ///////////////////////////////
     ///////////////////////////////
+
+    
 
     if(gd==1){
         return d_aux_buffer;
@@ -255,28 +275,34 @@ T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
         return result_ptr;
     }
     
+    #ifdef DEBUG
+
     // free host data
     free(buffer_read);
     free(aux_buffer_read);
+
+    #endif
+
 }
 
 int main(){
 
+    using bufferType = float;
     // define input host buffer 
-    int h_buffer[N];
-    int sum = 0;
+    bufferType h_buffer[N];
+    bufferType sum = 0;
 
     // define device buffer
-    int *d_buffer;
-    int *d_aux_buffer;
-    int* d_result;
+    bufferType *d_buffer;
+    bufferType *d_aux_buffer;
+    bufferType* d_result;
 
     // fill input values - [1, N]
-    for(int i=0; i<N; i++){
-        h_buffer[i] = i+1;
+    for(size_t i=0; i<N; i++){
+        h_buffer[i] = static_cast<bufferType>(i+1);
     }
 
-    size_t size = N*sizeof(int);
+    size_t size = N*sizeof(bufferType);
     size_t a_n = getGrid(BLOCK, N); // Initial aux buffer length - #blocks
 
     // Allocate memory on device
@@ -293,11 +319,12 @@ int main(){
     CHECK_CUDA(cudaDeviceSynchronize());
 
     // Copy result[0] to sum
-    CHECK_CUDA(cudaMemcpy(&sum, d_result, sizeof(int), cudaMemcpyDeviceToHost));
+    CHECK_CUDA(cudaMemcpy(&sum, d_result, sizeof(bufferType), cudaMemcpyDeviceToHost));
 
     cudaFree(d_buffer);
     cudaFree(d_aux_buffer);
 
    std::cout<<"The computed sum is: "<<sum<<std::endl;
+   std::cout << "Type of sum: "<< typeid(sum).name() <<std::endl;
 }
 
