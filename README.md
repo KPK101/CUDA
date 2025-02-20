@@ -11,5 +11,7 @@ This is a repository of CUDA kernels written in native CUDA and PyCUDA.
 ### Reduction
   - Reduction kernel
   - Blockwise computation done using an auxillary buffer
-  - TBD: thread pattern change to reduce divergence, shared memory
+  - Optimizations:
+   - Shared Memory    
+   - TBD: thread pattern change to reduce divergence
 
