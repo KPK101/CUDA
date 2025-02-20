@@ -72,23 +72,17 @@ int getGrid(int block, size_t n){
     return (n-1+2*block)/(2*block);
 }
 
-template<typename T>
-__global__ void reduce(T *buffer, int n){
-    size_t tid = threadIdx.x + blockIdx.x*blockDim.x;
-    size_t index;
-    for(int s=1; s<=BLOCK; s*=2){
-        // check if thread ids are divisible by 2*s 
-        index = 2*tid*s;
-        if(index+s<n){
-            buffer[index] += buffer[index+s];
-        }
-        __syncthreads();
-    }
-}
 
 template<typename T>
 __global__ void reduceBlock(T *buffer, T* aux_buffer, size_t n){
-  
+    /*
+        Kernel reduces a single thread block
+        Each thread block of size B processes an input tile of size 2*B
+        Optimizations:
+            This is a naive kernel with many inefficiencies
+            It is a good starting point to implement parallel reduction
+    */
+
     int bstart = blockIdx.x*2*blockDim.x;
     size_t tid = threadIdx.x;
     size_t index;
@@ -113,7 +107,17 @@ __global__ void reduceBlock(T *buffer, T* aux_buffer, size_t n){
 
 template<typename T>
 __global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, size_t n){
-  
+    /*
+        Kernel is built on naive kernel and is optimized for shared memory usage
+        Each thread block loads the input tile it processes into shared memory (size = 2*BLOCK)
+        Reduction is performed in shared memory which reduces global memory traffic - improving latency of read/writes
+        Optimizations:
+            Shared Memory
+        Issues:
+            Usage of shared memory introduces bank conflicts
+            This needs to be addressed for better usage of shared memory bandwidth
+    */
+    
     int bstart = blockIdx.x*2*blockDim.x;
     size_t tid = threadIdx.x;
     int sindex;
@@ -152,7 +156,18 @@ __global__ void reduceBlock_SharedMemory(T *buffer, T *aux_buffer, size_t n){
 
 template<typename T>
 T* deviceReduction(T*d_buffer, T*d_aux_buffer, size_t n, size_t stack){
-   
+    /*
+        This is a host function that recursively calls reduction kernels on input array
+        At each recursion step, the input array is reduced blockwise and sum is stored in 0th index of each block
+        The sum of each block is stored in an auxillary array (ith index in this array holds sum of ith block)
+        
+        Design:
+            We want two arrays - one input and one auxillary in each recursion call
+            It is optimal to make use of the first two device arrays created 
+            This can be done by switching the role of device and aux buffers for each new call
+            This works because at the end of each call, the input needed to be reduced is stored in aux and we do not need input data anymore
+    */
+    
     T* result_ptr;
     size_t size = n*sizeof(T);
     int gd = getGrid(BLOCK, n);
