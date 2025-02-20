@@ -170,8 +170,8 @@ T* deviceReduction(T *d_buffer, T *d_aux_buffer, size_t n, size_t stack){
         Design:
             We want two arrays - one input and one auxillary in each recursion call
             It is optimal to make use of the first two device arrays created 
-            This can be done by switching the role of device and aux buffers for each new call
-            This works because at the end of each call, the input needed to be reduced is stored in aux and we do not need input data anymore
+            This can be done by switching the role of buffer and aux_buffer for each new call
+            This works because at the end of each call the input needed to be reduced is stored in aux and we do not need buffer data anymore
     */
     
     T* result_ptr;
